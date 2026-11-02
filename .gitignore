@@ -1,0 +1,19 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+
+# testing
+coverage/
+
+# environment files (secrets)
+.env
+.env.*
+
+# misc
+.DS_Store
+*.pem
+*.tsbuildinfo
+npm-debug.log*
