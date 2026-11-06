@@ -118,6 +118,35 @@ describe("POST /api/auth/login", () => {
     expect(findUserByEmail).not.toHaveBeenCalled();
   });
 
+  it("responde 401 sem consultar o banco para corpo em stream sem content-length acima do teto", async () => {
+    const encoder = new TextEncoder();
+    const chunk = encoder.encode("a".repeat(1024));
+    let sent = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent >= 10) {
+          controller.close();
+          return;
+        }
+        sent += 1;
+        controller.enqueue(chunk);
+      },
+    });
+    const request = new Request("http://localhost/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: stream,
+      duplex: "half",
+    } as RequestInit & { duplex: "half" });
+
+    expect(request.headers.get("content-length")).toBeNull();
+    const response = await POST(request);
+
+    expect(response.status).toBe(401);
+    expect(sent).toBeLessThan(10);
+    expect(findUserByEmail).not.toHaveBeenCalled();
+  });
+
   it("responde 500 sem consultar o banco quando SESSION_SECRET falta ou é curto", async () => {
     vi.stubEnv("SESSION_SECRET", "");
     const missing = await POST(
