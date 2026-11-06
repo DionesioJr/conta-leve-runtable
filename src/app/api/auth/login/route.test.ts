@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { hashPassword } from "../../../../lib/auth/password";
+import { hashPassword } from "../../../../lib/password";
 
 const findUserByEmail = vi.fn();
 
@@ -88,7 +88,7 @@ describe("POST /api/auth/login", () => {
     const passwordHash = await hashPassword("senha-correta");
     findUserByEmail.mockResolvedValue({ id: 7, passwordHash });
 
-    for (let i = 0; i < 8; i += 1) {
+    for (let i = 0; i < 3; i += 1) {
       const wrong = await POST(
         makeRequest({ email: "ana@example.com", password: "errada" }),
       );

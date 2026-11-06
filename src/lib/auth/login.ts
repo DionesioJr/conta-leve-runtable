@@ -1,4 +1,4 @@
-import { verifyPassword } from "./password";
+import { verifyPassword } from "../password";
 import { createSessionToken } from "./session";
 
 export type LoginInput = { email: string; password: string };
@@ -18,7 +18,16 @@ export type LoginResult =
 const MAX_EMAIL_LENGTH = 255;
 const MAX_PASSWORD_LENGTH = 200;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const DUMMY_HASH = `scrypt$${"00".repeat(16)}$${"00".repeat(64)}`;
+// Hash no formato de src/lib/password.ts (scrypt$N$r$p$salt$key, base64) com o mesmo custo de
+// hashPassword, para que e-mail inexistente gaste o mesmo tempo de verificação.
+const DUMMY_HASH = [
+  "scrypt",
+  131072,
+  8,
+  1,
+  Buffer.alloc(16).toString("base64"),
+  Buffer.alloc(64).toString("base64"),
+].join("$");
 
 export function parseLoginInput(body: unknown): LoginInput | null {
   if (typeof body !== "object" || body === null) {

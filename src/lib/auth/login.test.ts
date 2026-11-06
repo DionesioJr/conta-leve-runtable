@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { login, parseLoginInput } from "./login";
-import { hashPassword } from "./password";
+import { hashPassword } from "../password";
 import { createSessionToken, verifySessionToken } from "./session";
 
 const SECRET = "x".repeat(32);
