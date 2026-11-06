@@ -15,6 +15,7 @@ export type SignupValidation =
 export const NAME_MAX_LENGTH = 120;
 export const EMAIL_MAX_LENGTH = 255;
 export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_MAX_LENGTH = 1024;
 
 export const MESSAGES = {
   nameRequired: "Informe seu nome.",
@@ -22,9 +23,12 @@ export const MESSAGES = {
   emailRequired: "Informe seu e-mail.",
   emailInvalid: "Informe um e-mail válido.",
   passwordTooShort: `A senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres.`,
+  passwordTooLong: `A senha deve ter no máximo ${PASSWORD_MAX_LENGTH} caracteres.`,
   passwordMismatch: "As senhas não coincidem.",
   emailTaken: "Já existe uma conta com este e-mail.",
   bodyNotJson: "O corpo da requisição deve ser JSON.",
+  bodyTooLarge: "O corpo da requisição é grande demais.",
+  rateLimited: "Muitas tentativas. Aguarde alguns minutos e tente novamente.",
   unexpectedError: "Não foi possível criar a conta. Tente novamente.",
 } as const;
 
@@ -44,6 +48,10 @@ function readTrimmedText(record: Record<string, unknown>, key: string): string {
 function readRawText(record: Record<string, unknown>, key: string): string {
   const value = record[key];
   return typeof value === "string" ? value : "";
+}
+
+export function readNormalizedEmail(body: unknown): string {
+  return readTrimmedText(readRecord(body), "email").toLowerCase();
 }
 
 export function validateSignup(body: unknown): SignupValidation {
@@ -69,8 +77,11 @@ export function validateSignup(body: unknown): SignupValidation {
 
   // Conta code points (caracteres Unicode), não unidades UTF-16: emojis e
   // caracteres fora do BMP ocupam mais de uma unidade em `.length`.
-  if ([...password].length < PASSWORD_MIN_LENGTH) {
+  const passwordLength = [...password].length;
+  if (passwordLength < PASSWORD_MIN_LENGTH) {
     errors.password = MESSAGES.passwordTooShort;
+  } else if (passwordLength > PASSWORD_MAX_LENGTH) {
+    errors.password = MESSAGES.passwordTooLong;
   }
 
   if (passwordConfirmation !== password) {
