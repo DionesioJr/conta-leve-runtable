@@ -13,7 +13,7 @@ describe("migration 0001_create_user (up)", () => {
     expect(up).toMatch(/CREATE TABLE `user`/);
   });
 
-  it.each(["email", "password_hash", "name", "created_at", "updated_at"])(
+  it.each(["uuid", "email", "password_hash", "name", "created_at", "updated_at"])(
     "defines the %s column as NOT NULL",
     (column) => {
       const line = columnLine(column);
@@ -21,6 +21,14 @@ describe("migration 0001_create_user (up)", () => {
       expect(line).toMatch(/NOT NULL/);
     },
   );
+
+  it("stores the external identifier as a CHAR(36) uuid", () => {
+    expect(columnLine("uuid")).toMatch(/CHAR\(36\)/);
+  });
+
+  it("enforces a unique constraint on uuid in the database", () => {
+    expect(up).toMatch(/UNIQUE KEY `user_uuid_unique` \(`uuid`\)/);
+  });
 
   it("enforces a unique constraint on email in the database", () => {
     expect(up).toMatch(/UNIQUE KEY `user_email_unique` \(`email`\)/);

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createConnection, type Connection } from "mysql2/promise";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -26,10 +27,14 @@ function uniqueEmail(): string {
 describe.skipIf(!databaseUrl)("migration 0001_create_user (MySQL real)", () => {
   let connection: Connection;
 
-  async function insertUser(email: string | null, name: string | null = "Ana") {
+  async function insertUser(
+    email: string | null,
+    name: string | null = "Ana",
+    uuid: string | null = randomUUID(),
+  ) {
     return connection.query(
-      "INSERT INTO `user` (`email`, `password_hash`, `name`) VALUES (?, ?, ?)",
-      [email, "$2b$10$hash-de-teste", name],
+      "INSERT INTO `user` (`uuid`, `email`, `password_hash`, `name`) VALUES (?, ?, ?, ?)",
+      [uuid, email, "$2b$10$hash-de-teste", name],
     );
   }
 
@@ -51,8 +56,22 @@ describe.skipIf(!databaseUrl)("migration 0001_create_user (MySQL real)", () => {
     const [rows] = await connection.query("SHOW COLUMNS FROM `user`");
     const names = (rows as Array<{ Field: string }>).map((row) => row.Field);
     expect(names).toEqual(
-      expect.arrayContaining(["email", "password_hash", "name", "created_at", "updated_at"]),
+      expect.arrayContaining(["uuid", "email", "password_hash", "name", "created_at", "updated_at"]),
     );
+  });
+
+  it("refuses a second user with the same uuid (ER_DUP_ENTRY)", async () => {
+    const uuid = randomUUID();
+    await insertUser(uniqueEmail(), "Ana", uuid);
+    await expect(insertUser(uniqueEmail(), "Bia", uuid)).rejects.toMatchObject({
+      code: "ER_DUP_ENTRY",
+    });
+  });
+
+  it("refuses a NULL uuid", async () => {
+    await expect(insertUser(uniqueEmail(), "Ana", null)).rejects.toMatchObject({
+      code: "ER_BAD_NULL_ERROR",
+    });
   });
 
   it("accepts users with distinct emails", async () => {
