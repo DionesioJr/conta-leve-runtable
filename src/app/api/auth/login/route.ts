@@ -35,7 +35,8 @@ export async function POST(request: Request) {
       now: () => Date.now(),
       secret,
     });
-  } catch {
+  } catch (error) {
+    console.error("POST /api/auth/login: falha ao validar credenciais", error);
     return unavailable();
   }
 
