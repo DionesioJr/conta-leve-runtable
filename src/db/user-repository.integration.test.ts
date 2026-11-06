@@ -4,8 +4,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const up = readFileSync(new URL("./migrations/0001_create_user.up.sql", import.meta.url), "utf8");
 
-// Requer um MySQL acessível e um usuário com CREATE/DROP DATABASE.
-// Sem TEST_DATABASE_URL o bloco é pulado localmente; no CI a ausência falha o arquivo.
 const databaseUrl = process.env.TEST_DATABASE_URL ?? "";
 if (process.env.CI && !databaseUrl) {
   throw new Error(
