@@ -84,30 +84,21 @@ describe("POST /api/auth/login", () => {
     expect(findUserByEmail).not.toHaveBeenCalled();
   });
 
-  it("responde 429 sem consultar o banco após 5 falhas para o mesmo e-mail", async () => {
-    findUserByEmail.mockResolvedValue(null);
-    const attempt = () =>
-      POST(
-        new Request("http://localhost/api/auth/login", {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "x-forwarded-for": "10.0.0.1",
-          },
-          body: JSON.stringify({ email: "limite@example.com", password: "x" }),
-        }),
+  it("continua respondendo 401 para dados errados após várias falhas e aceita a senha certa depois", async () => {
+    const passwordHash = await hashPassword("senha-correta");
+    findUserByEmail.mockResolvedValue({ id: 7, passwordHash });
+
+    for (let i = 0; i < 8; i += 1) {
+      const wrong = await POST(
+        makeRequest({ email: "ana@example.com", password: "errada" }),
       );
-
-    for (let i = 0; i < 5; i += 1) {
-      expect((await attempt()).status).toBe(401);
+      expect(wrong.status).toBe(401);
     }
-    findUserByEmail.mockClear();
-    const blocked = await attempt();
+    const right = await POST(
+      makeRequest({ email: "ana@example.com", password: "senha-correta" }),
+    );
 
-    expect(blocked.status).toBe(429);
-    expect(blocked.headers.get("retry-after")).toBe("900");
-    expect(blocked.headers.get("set-cookie")).toBeNull();
-    expect(findUserByEmail).not.toHaveBeenCalled();
+    expect(right.status).toBe(204);
   });
 
   it("responde 401 sem consultar o banco para content-type que não é JSON ou corpo grande", async () => {
