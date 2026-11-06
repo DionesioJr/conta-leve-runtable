@@ -84,6 +84,49 @@ describe("POST /api/auth/login", () => {
     expect(findUserByEmail).not.toHaveBeenCalled();
   });
 
+  it("responde 429 sem consultar o banco após 5 falhas para o mesmo e-mail", async () => {
+    findUserByEmail.mockResolvedValue(null);
+    const attempt = () =>
+      POST(
+        new Request("http://localhost/api/auth/login", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-forwarded-for": "10.0.0.1",
+          },
+          body: JSON.stringify({ email: "limite@example.com", password: "x" }),
+        }),
+      );
+
+    for (let i = 0; i < 5; i += 1) {
+      expect((await attempt()).status).toBe(401);
+    }
+    findUserByEmail.mockClear();
+    const blocked = await attempt();
+
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get("retry-after")).toBe("900");
+    expect(blocked.headers.get("set-cookie")).toBeNull();
+    expect(findUserByEmail).not.toHaveBeenCalled();
+  });
+
+  it("responde 401 sem consultar o banco para content-type que não é JSON ou corpo grande", async () => {
+    const form = await POST(
+      new Request("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "text/plain" },
+        body: JSON.stringify({ email: "ana@example.com", password: "a" }),
+      }),
+    );
+    const big = await POST(
+      makeRequest(null, JSON.stringify({ email: "ana@example.com", password: "a".repeat(5000) })),
+    );
+
+    expect(form.status).toBe(401);
+    expect(big.status).toBe(401);
+    expect(findUserByEmail).not.toHaveBeenCalled();
+  });
+
   it("responde 500 sem consultar o banco quando SESSION_SECRET falta ou é curto", async () => {
     vi.stubEnv("SESSION_SECRET", "");
     const missing = await POST(
