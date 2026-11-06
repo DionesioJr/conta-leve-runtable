@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { NAV_TABS, SIGN_IN_PATH, isActiveTab } from "@/lib/navigation";
+import { requestSignOut } from "@/lib/sign-out";
 import { focusRing } from "@/lib/styles";
 
 export function AppHeader() {
@@ -15,12 +16,10 @@ export function AppHeader() {
   async function handleSignOut() {
     setPending(true);
     setError(null);
-    try {
-      const response = await fetch("/api/auth/logout", { method: "POST" });
-      if (!response.ok) throw new Error("logout failed");
+    if (await requestSignOut()) {
       router.push(SIGN_IN_PATH);
       router.refresh();
-    } catch {
+    } else {
       setError("Não foi possível sair. Tente novamente.");
       setPending(false);
     }
