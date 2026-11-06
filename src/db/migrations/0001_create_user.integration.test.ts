@@ -7,8 +7,14 @@ const up = readFileSync(new URL("./0001_create_user.up.sql", import.meta.url), "
 const down = readFileSync(new URL("./0001_create_user.down.sql", import.meta.url), "utf8");
 
 // Requer um MySQL acessível e um usuário com CREATE/DROP DATABASE.
-// Sem TEST_DATABASE_URL o bloco é pulado; o critério só é verificado com ela definida.
+// Sem TEST_DATABASE_URL o bloco é pulado localmente; o critério só é verificado com ela definida.
+// No CI (variável CI definida) a ausência da URL falha o arquivo, para que a suíte não passe sem provar a unicidade do e-mail.
 const databaseUrl = process.env.TEST_DATABASE_URL ?? "";
+if (process.env.CI && !databaseUrl) {
+  throw new Error(
+    "TEST_DATABASE_URL é obrigatória no CI: sem ela o critério de unicidade do e-mail não é verificado.",
+  );
+}
 const databaseName = `conta_leve_mig_${process.pid}_${Date.now()}`;
 
 function uniqueEmail(): string {
