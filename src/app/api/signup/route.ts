@@ -1,7 +1,7 @@
 import { getPool } from "../../../db/connection";
 import { insertUser } from "../../../db/user-repository";
 import { hashPassword } from "../../../lib/password";
-import { readClientIp, readTrustedProxyCount } from "../../../lib/client-ip";
+import { readClientIp } from "../../../lib/client-ip";
 import { signupAttemptLimiter } from "../../../lib/signup-attempt-limiter";
 import { MAX_JSON_BODY_BYTES, readJsonBody } from "../../../lib/read-json-body";
 import { signUp } from "../../../lib/signup";
@@ -20,11 +20,12 @@ export async function POST(request: Request): Promise<Response> {
     const outcome = await signUp(parsed.body, {
       hashPassword,
       insertUser: (user) => insertUser(getPool(), user),
-      // Sem IP de origem confiável não há chave para contar: o limite não se aplica,
-      // em vez de juntar todos os clientes numa chave compartilhada.
       registerAttempt: () => {
-        const clientIp = readClientIp(request, readTrustedProxyCount());
-        return clientIp === null ? { allowed: true } : signupAttemptLimiter.consume(clientIp);
+        const clientIp = readClientIp(request);
+        if (clientIp === null) {
+          throw new Error("Cabeçalho x-forwarded-for ausente: IP de origem não identificado.");
+        }
+        return signupAttemptLimiter.consume(clientIp);
       },
     });
 

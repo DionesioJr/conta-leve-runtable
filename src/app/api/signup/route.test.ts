@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { insertUser } from "../../../db/user-repository";
 import { SIGNUP_ATTEMPT_LIMIT, signupAttemptLimiter } from "../../../lib/signup-attempt-limiter";
 import { POST } from "./route";
@@ -37,12 +37,6 @@ function postJson(body: unknown, ip: string = CLIENT_IP): Request {
 beforeEach(() => {
   insertUserMock.mockReset();
   signupAttemptLimiter.reset();
-  // Um proxy confiável na frente: o último hop do x-forwarded-for é o IP de origem.
-  vi.stubEnv("TRUSTED_PROXY_COUNT", "1");
-});
-
-afterEach(() => {
-  vi.unstubAllEnvs();
 });
 
 describe("POST /api/signup", () => {
@@ -162,15 +156,23 @@ describe("POST /api/signup", () => {
     expect(response.status).toBe(201);
   });
 
-  it("does not apply the limit, nor share one bucket, when no trusted proxy is configured", async () => {
-    vi.stubEnv("TRUSTED_PROXY_COUNT", "");
+  it("ignores client-supplied hops placed before the platform hop, so rotating them does not reset the limit", async () => {
+    insertUserMock.mockResolvedValue({ ok: false, reason: "email_taken" });
+
+    for (let attempt = 0; attempt < SIGNUP_ATTEMPT_LIMIT; attempt += 1) {
+      await POST(postJson(VALID_BODY, `203.0.113.${attempt}, ${CLIENT_IP}`));
+    }
+
+    const response = await POST(postJson(VALID_BODY, `198.51.100.200, ${CLIENT_IP}`));
+
+    expect(response.status).toBe(429);
+  });
+
+  it("answers 500 and stores nothing when the origin IP cannot be identified, never sharing one bucket", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     insertUserMock.mockResolvedValue({ ok: true, id: 11 });
 
-    for (let attempt = 0; attempt < SIGNUP_ATTEMPT_LIMIT + 5; attempt += 1) {
-      const response = await POST(postJson(VALID_BODY, `203.0.113.${attempt}`));
-      expect(response.status).toBe(201);
-    }
-    const realIpOnlyResponse = await POST(
+    const response = await POST(
       new Request("http://localhost/api/signup", {
         method: "POST",
         headers: { "content-type": "application/json", "x-real-ip": "203.0.113.99" },
@@ -178,7 +180,9 @@ describe("POST /api/signup", () => {
       }),
     );
 
-    expect(realIpOnlyResponse.status).toBe(201);
+    expect(response.status).toBe(500);
+    expect(insertUserMock).not.toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   it("does not count requests with an invalid body toward the limit", async () => {
