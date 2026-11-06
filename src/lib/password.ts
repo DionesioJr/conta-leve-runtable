@@ -1,5 +1,8 @@
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 
+// Decisão de algoritmo (CLV-5): scrypt do node:crypto, em vez de bcrypt ou argon2 citados no título.
+// Motivo: é memory-hard, está entre as opções da OWASP Password Storage Cheat Sheet e não adiciona
+// dependência nem altera o lockfile. Trocar de algoritmo exige novo identificador no formato do hash.
 const ALGORITHM = "scrypt";
 const KEY_LENGTH = 64;
 const SALT_LENGTH = 16;
