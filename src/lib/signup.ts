@@ -1,4 +1,5 @@
 import type { InsertUserResult, NewUser } from "../db/user-repository";
+import type { AttemptDecision } from "./signup-attempt-limiter";
 import { MESSAGES, validateSignup, type SignupErrors } from "./signup-validation";
 
 export type CreatedUser = {
@@ -10,11 +11,13 @@ export type CreatedUser = {
 export type SignupDependencies = {
   hashPassword: (password: string) => Promise<string>;
   insertUser: (user: NewUser) => Promise<InsertUserResult>;
+  registerAttempt: () => AttemptDecision;
 };
 
 export type SignupOutcome =
   | { ok: true; user: CreatedUser }
-  | { ok: false; errors: SignupErrors };
+  | { ok: false; errors: SignupErrors }
+  | { ok: false; rateLimited: true; retryAfterSeconds: number };
 
 export async function signUp(
   body: unknown,
@@ -23,6 +26,11 @@ export async function signUp(
   const validation = validateSignup(body);
   if (!validation.ok) {
     return { ok: false, errors: validation.errors };
+  }
+
+  const attempt = dependencies.registerAttempt();
+  if (!attempt.allowed) {
+    return { ok: false, rateLimited: true, retryAfterSeconds: attempt.retryAfterSeconds };
   }
 
   const { name, email, password } = validation.input;

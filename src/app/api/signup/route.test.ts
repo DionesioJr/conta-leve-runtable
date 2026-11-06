@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { insertUser } from "../../../db/user-repository";
+import { SIGNUP_ATTEMPT_LIMIT, signupAttemptLimiter } from "../../../lib/signup-attempt-limiter";
 import { POST } from "./route";
 
 vi.mock("../../../db/connection", () => ({
@@ -23,16 +24,19 @@ const VALID_BODY = {
   passwordConfirmation: "senha-segura-123",
 };
 
-function postJson(body: unknown): Request {
+const CLIENT_IP = "198.51.100.7";
+
+function postJson(body: unknown, ip: string = CLIENT_IP): Request {
   return new Request("http://localhost/api/signup", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "x-forwarded-for": ip },
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 }
 
 beforeEach(() => {
   insertUserMock.mockReset();
+  signupAttemptLimiter.reset();
 });
 
 describe("POST /api/signup", () => {
@@ -131,5 +135,62 @@ describe("POST /api/signup", () => {
       errors: { form: "Não foi possível criar a conta. Tente novamente." },
     });
     consoleError.mockRestore();
+  });
+
+  it("answers 429 with Retry-After once one IP exceeds the attempt limit, without storing", async () => {
+    insertUserMock.mockResolvedValue({ ok: false, reason: "email_taken" });
+
+    for (let attempt = 0; attempt < SIGNUP_ATTEMPT_LIMIT; attempt += 1) {
+      await POST(postJson(VALID_BODY));
+    }
+    insertUserMock.mockClear();
+
+    const response = await POST(postJson(VALID_BODY));
+
+    expect(response.status).toBe(429);
+    expect(Number(response.headers.get("Retry-After"))).toBeGreaterThan(0);
+    await expect(response.json()).resolves.toEqual({
+      errors: { form: "Muitas tentativas de cadastro. Aguarde alguns minutos e tente novamente." },
+    });
+    expect(insertUserMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the limit per IP, so another client can still sign up for the same email", async () => {
+    insertUserMock.mockResolvedValue({ ok: true, id: 9 });
+
+    for (let attempt = 0; attempt < SIGNUP_ATTEMPT_LIMIT; attempt += 1) {
+      await POST(postJson(VALID_BODY));
+    }
+
+    const response = await POST(postJson(VALID_BODY, "203.0.113.50"));
+
+    expect(response.status).toBe(201);
+  });
+
+  it("does not count requests with an invalid body toward the limit", async () => {
+    insertUserMock.mockResolvedValue({ ok: true, id: 9 });
+
+    for (let attempt = 0; attempt < SIGNUP_ATTEMPT_LIMIT + 5; attempt += 1) {
+      await POST(postJson({ ...VALID_BODY, email: "sem-arroba" }));
+    }
+
+    const response = await POST(postJson(VALID_BODY));
+
+    expect(response.status).toBe(201);
+  });
+
+  it("still allows the last attempt under the limit from the same IP when the email differs", async () => {
+    insertUserMock.mockResolvedValue({ ok: false, reason: "email_taken" });
+
+    for (let attempt = 0; attempt < SIGNUP_ATTEMPT_LIMIT - 1; attempt += 1) {
+      await POST(postJson(VALID_BODY));
+    }
+    insertUserMock.mockResolvedValue({ ok: true, id: 10 });
+
+    const response = await POST(
+      postJson({ ...VALID_BODY, email: "outra@exemplo.com.br" }),
+    );
+
+    expect(response.status).toBe(201);
   });
 });

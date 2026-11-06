@@ -10,10 +10,14 @@ const VALID_BODY = {
 
 const FAKE_HASH = "scrypt$131072$8$1$c2FsdA==$a2V5";
 
-function makeDependencies(insertUser: SignupDependencies["insertUser"] = async () => ({ ok: true, id: 7 })) {
+function makeDependencies(
+  insertUser: SignupDependencies["insertUser"] = async () => ({ ok: true, id: 7 }),
+  registerAttempt: SignupDependencies["registerAttempt"] = () => ({ allowed: true }),
+) {
   return {
     hashPassword: vi.fn(async () => FAKE_HASH),
     insertUser: vi.fn(insertUser),
+    registerAttempt: vi.fn(registerAttempt),
   };
 }
 
@@ -75,5 +79,28 @@ describe("signUp", () => {
     });
 
     await expect(signUp(VALID_BODY, dependencies)).rejects.toBe(failure);
+  });
+
+  it("counts an attempt only after the body is valid", async () => {
+    const dependencies = makeDependencies();
+    await signUp({ ...VALID_BODY, email: "sem-arroba" }, dependencies);
+    await signUp(null, dependencies);
+
+    expect(dependencies.registerAttempt).not.toHaveBeenCalled();
+
+    await signUp(VALID_BODY, dependencies);
+    expect(dependencies.registerAttempt).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops before hashing or storing when the attempt is rate limited", async () => {
+    const dependencies = makeDependencies(undefined, () => ({
+      allowed: false,
+      retryAfterSeconds: 120,
+    }));
+    const outcome = await signUp(VALID_BODY, dependencies);
+
+    expect(outcome).toEqual({ ok: false, rateLimited: true, retryAfterSeconds: 120 });
+    expect(dependencies.hashPassword).not.toHaveBeenCalled();
+    expect(dependencies.insertUser).not.toHaveBeenCalled();
   });
 });

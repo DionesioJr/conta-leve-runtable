@@ -1,6 +1,8 @@
 import { getPool } from "../../../db/connection";
 import { insertUser } from "../../../db/user-repository";
 import { hashPassword } from "../../../lib/password";
+import { readClientIp } from "../../../lib/client-ip";
+import { signupAttemptLimiter } from "../../../lib/signup-attempt-limiter";
 import { MAX_JSON_BODY_BYTES, readJsonBody } from "../../../lib/read-json-body";
 import { signUp } from "../../../lib/signup";
 import { MESSAGES } from "../../../lib/signup-validation";
@@ -18,9 +20,16 @@ export async function POST(request: Request): Promise<Response> {
     const outcome = await signUp(parsed.body, {
       hashPassword,
       insertUser: (user) => insertUser(getPool(), user),
+      registerAttempt: () => signupAttemptLimiter.consume(readClientIp(request)),
     });
 
     if (!outcome.ok) {
+      if ("rateLimited" in outcome) {
+        return Response.json(
+          { errors: { form: MESSAGES.rateLimited } },
+          { status: 429, headers: { "Retry-After": String(outcome.retryAfterSeconds) } },
+        );
+      }
       return Response.json({ errors: outcome.errors }, { status: 400 });
     }
 

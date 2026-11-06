@@ -28,6 +28,7 @@ export const MESSAGES = {
   emailTaken: "Já existe uma conta com este e-mail.",
   bodyNotJson: "O corpo da requisição deve ser JSON.",
   bodyTooLarge: "O corpo da requisição é grande demais.",
+  rateLimited: "Muitas tentativas de cadastro. Aguarde alguns minutos e tente novamente.",
   unexpectedError: "Não foi possível criar a conta. Tente novamente.",
 } as const;
 
