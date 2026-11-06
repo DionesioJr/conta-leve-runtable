@@ -40,8 +40,20 @@ describe("verifyPassword", () => {
     await expect(verifyPassword("açaí-É-ção-123", hash)).resolves.toBe(true);
   });
 
+  it("treats NFC and NFD forms of the same password as equal (NFKC)", async () => {
+    const nfc = "açaí-É".normalize("NFC");
+    const nfd = nfc.normalize("NFD");
+    expect(nfd).not.toBe(nfc);
+    const hash = await hashPassword(nfc);
+    await expect(verifyPassword(nfd, hash)).resolves.toBe(true);
+    const hashFromNfd = await hashPassword(nfd);
+    await expect(verifyPassword(nfc, hashFromNfd)).resolves.toBe(true);
+  });
+
   it.each([
     ["empty string", ""],
+    ["short even-length salt", `scrypt$aabb$${"a".repeat(128)}`],
+    ["long salt (17 bytes)", `scrypt$${"a".repeat(34)}$${"a".repeat(128)}`],
     ["plain text", "senha-segura-123"],
     ["wrong scheme", "bcrypt$aa$bb"],
     ["missing key", "scrypt$aabb"],

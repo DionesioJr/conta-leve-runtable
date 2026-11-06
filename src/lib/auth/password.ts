@@ -32,7 +32,7 @@ export async function verifyPassword(password: string, stored: string): Promise<
   if (
     !HEX_PATTERN.test(saltHex) ||
     !HEX_PATTERN.test(keyHex) ||
-    saltHex.length % 2 !== 0 ||
+    saltHex.length !== SALT_BYTES * 2 ||
     keyHex.length !== KEY_BYTES * 2
   ) {
     return false;
