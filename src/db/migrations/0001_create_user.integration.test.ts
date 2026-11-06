@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createConnection, type Connection } from "mysql2/promise";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -17,8 +16,11 @@ if (process.env.CI && !databaseUrl) {
 }
 const databaseName = `conta_leve_mig_${process.pid}_${Date.now()}`;
 
+let emailSequence = 0;
+
 function uniqueEmail(): string {
-  return `${randomUUID()}@exemplo.com.br`;
+  emailSequence += 1;
+  return `pessoa.${process.pid}.${Date.now()}.${emailSequence}@exemplo.com.br`;
 }
 
 describe.skipIf(!databaseUrl)("migration 0001_create_user (MySQL real)", () => {
@@ -26,8 +28,8 @@ describe.skipIf(!databaseUrl)("migration 0001_create_user (MySQL real)", () => {
 
   async function insertUser(email: string | null, name: string | null = "Ana") {
     return connection.query(
-      "INSERT INTO `user` (`uuid`, `email`, `password_hash`, `name`) VALUES (?, ?, ?, ?)",
-      [randomUUID(), email, "$2b$10$hash-de-teste", name],
+      "INSERT INTO `user` (`email`, `password_hash`, `name`) VALUES (?, ?, ?)",
+      [email, "$2b$10$hash-de-teste", name],
     );
   }
 

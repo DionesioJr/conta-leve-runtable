@@ -26,9 +26,7 @@ describe("migration 0001_create_user (up)", () => {
     expect(up).toMatch(/UNIQUE KEY `user_email_unique` \(`email`\)/);
   });
 
-  it("uses a uuid as the external identifier and keeps an internal primary key", () => {
-    expect(columnLine("uuid")).toMatch(/NOT NULL/);
-    expect(up).toMatch(/UNIQUE KEY `user_uuid_unique` \(`uuid`\)/);
+  it("uses an internal id as the primary key", () => {
     expect(up).toMatch(/PRIMARY KEY \(`id`\)/);
   });
 
