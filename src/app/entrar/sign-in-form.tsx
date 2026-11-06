@@ -2,9 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { focusRing } from "@/lib/styles";
 
-const focusRing =
-  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700";
 const inputClass = `mt-1 w-full rounded border border-slate-700 px-3 py-2 ${focusRing}`;
 
 export function SignInForm() {

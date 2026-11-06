@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { NAV_TABS, SIGN_IN_PATH, isActiveTab } from "@/lib/navigation";
+import { focusRing } from "@/lib/styles";
 
 export function AppHeader() {
   const pathname = usePathname();
@@ -24,9 +25,6 @@ export function AppHeader() {
       setPending(false);
     }
   }
-
-  const focusRing =
-    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700";
 
   return (
     <header className="border-b border-slate-300 bg-white">

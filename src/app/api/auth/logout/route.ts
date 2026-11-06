@@ -1,6 +1,5 @@
 import { cookies } from "next/headers";
-
-const SESSION_COOKIE = "session";
+import { SESSION_COOKIE } from "@/lib/access";
 
 export async function POST() {
   const store = await cookies();
