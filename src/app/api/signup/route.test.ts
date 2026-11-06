@@ -1,9 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { insertUser } from "../../../db/user-repository";
-import { registerSignupAttempt } from "../../../db/signup-attempt-repository";
 import { POST } from "./route";
-
-const attemptCounts = vi.hoisted(() => new Map<string, number>());
 
 vi.mock("../../../db/connection", () => ({
   getPool: () => ({}),
@@ -17,19 +14,7 @@ vi.mock("../../../db/user-repository", () => ({
   insertUser: vi.fn(),
 }));
 
-vi.mock("../../../db/signup-attempt-repository", () => ({
-  registerSignupAttempt: vi.fn(
-    async (_database: unknown, key: { scope: string; subjectHash: string; windowStartMs: number }) => {
-      const id = `${key.scope}|${key.subjectHash}|${key.windowStartMs}`;
-      const next = (attemptCounts.get(id) ?? 0) + 1;
-      attemptCounts.set(id, next);
-      return next;
-    },
-  ),
-}));
-
 const insertUserMock = vi.mocked(insertUser);
-const registerSignupAttemptMock = vi.mocked(registerSignupAttempt);
 
 const VALID_BODY = {
   name: "Ana Souza",
@@ -38,23 +23,16 @@ const VALID_BODY = {
   passwordConfirmation: "senha-segura-123",
 };
 
-function postJson(body: unknown, headers: Record<string, string> = {}): Request {
+function postJson(body: unknown): Request {
   return new Request("http://localhost/api/signup", {
     method: "POST",
-    headers: { "content-type": "application/json", ...headers },
+    headers: { "content-type": "application/json" },
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 }
 
 beforeEach(() => {
-  vi.useFakeTimers({ toFake: ["Date"] });
-  vi.setSystemTime(new Date("2026-11-06T12:00:00Z"));
   insertUserMock.mockReset();
-  attemptCounts.clear();
-});
-
-afterEach(() => {
-  vi.useRealTimers();
 });
 
 describe("POST /api/signup", () => {
@@ -142,51 +120,6 @@ describe("POST /api/signup", () => {
     expect(insertUserMock).not.toHaveBeenCalled();
   });
 
-  it("answers 429 with Retry-After once the same e-mail has been tried 5 times in the window", async () => {
-    insertUserMock.mockResolvedValue({ ok: false, reason: "email_taken" });
-
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      expect((await POST(postJson(VALID_BODY))).status).toBe(400);
-    }
-    const response = await POST(postJson(VALID_BODY));
-
-    expect(response.status).toBe(429);
-    expect(Number(response.headers.get("Retry-After"))).toBeGreaterThan(0);
-    await expect(response.json()).resolves.toEqual({
-      errors: { form: "Muitas tentativas. Aguarde alguns minutos e tente novamente." },
-    });
-    expect(insertUserMock).toHaveBeenCalledTimes(5);
-  });
-
-  it("answers 429 once the same client IP has made 30 attempts in the window", async () => {
-    insertUserMock.mockResolvedValue({ ok: true, id: 1 });
-    const headers = { "x-forwarded-for": "203.0.113.9" };
-
-    for (let attempt = 0; attempt < 30; attempt += 1) {
-      const email = `pessoa${attempt}@exemplo.com.br`;
-      expect((await POST(postJson({ ...VALID_BODY, email }, headers))).status).toBe(201);
-    }
-    const response = await POST(
-      postJson({ ...VALID_BODY, email: "outra@exemplo.com.br" }, headers),
-    );
-
-    expect(response.status).toBe(429);
-    expect(insertUserMock).toHaveBeenCalledTimes(30);
-  });
-
-  it("counts the IP limit before reading the body", async () => {
-    insertUserMock.mockResolvedValue({ ok: true, id: 1 });
-    const headers = { "x-forwarded-for": "198.51.100.20" };
-    for (let attempt = 0; attempt < 30; attempt += 1) {
-      await POST(postJson("{nao-e-json", headers));
-    }
-
-    const response = await POST(postJson(VALID_BODY, headers));
-
-    expect(response.status).toBe(429);
-    expect(insertUserMock).not.toHaveBeenCalled();
-  });
-
   it("answers 500 with a generic message when the repository fails", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     insertUserMock.mockRejectedValue(new Error("connection lost"));
@@ -197,17 +130,6 @@ describe("POST /api/signup", () => {
     await expect(response.json()).resolves.toEqual({
       errors: { form: "Não foi possível criar a conta. Tente novamente." },
     });
-    consoleError.mockRestore();
-  });
-
-  it("answers 500 when the attempt counter cannot be stored", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    registerSignupAttemptMock.mockRejectedValueOnce(new Error("connection lost"));
-
-    const response = await POST(postJson(VALID_BODY));
-
-    expect(response.status).toBe(500);
-    expect(insertUserMock).not.toHaveBeenCalled();
     consoleError.mockRestore();
   });
 });

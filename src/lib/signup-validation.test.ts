@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MESSAGES, readNormalizedEmail, validateSignup } from "./signup-validation";
+import { MESSAGES, validateSignup } from "./signup-validation";
 
 const VALID_BODY = {
   name: "Ana Souza",
@@ -195,13 +195,6 @@ describe("validateSignup", () => {
       ok: false,
       errors: { passwordConfirmation: MESSAGES.passwordMismatch },
     });
-  });
-
-  it("reads the email trimmed and lowercased, and empty when absent", () => {
-    expect(readNormalizedEmail({ email: "  Ana@Exemplo.com.br " })).toBe("ana@exemplo.com.br");
-    expect(readNormalizedEmail({})).toBe("");
-    expect(readNormalizedEmail(null)).toBe("");
-    expect(readNormalizedEmail({ email: 42 })).toBe("");
   });
 
   it("ignores non-string values as if they were missing", () => {

@@ -28,7 +28,6 @@ export const MESSAGES = {
   emailTaken: "Já existe uma conta com este e-mail.",
   bodyNotJson: "O corpo da requisição deve ser JSON.",
   bodyTooLarge: "O corpo da requisição é grande demais.",
-  rateLimited: "Muitas tentativas. Aguarde alguns minutos e tente novamente.",
   unexpectedError: "Não foi possível criar a conta. Tente novamente.",
 } as const;
 
@@ -48,10 +47,6 @@ function readTrimmedText(record: Record<string, unknown>, key: string): string {
 function readRawText(record: Record<string, unknown>, key: string): string {
   const value = record[key];
   return typeof value === "string" ? value : "";
-}
-
-export function readNormalizedEmail(body: unknown): string {
-  return readTrimmedText(readRecord(body), "email").toLowerCase();
 }
 
 export function validateSignup(body: unknown): SignupValidation {
