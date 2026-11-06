@@ -76,27 +76,11 @@ describe("validateSignup", () => {
     ).toBe(true);
   });
 
-  it("accepts a password with exactly 1024 characters", () => {
-    const password = "a".repeat(1024);
+  it("accepts a long password with 8 or more characters, without an upper limit", () => {
+    const password = "a".repeat(5000);
     expect(
       validateSignup({ ...VALID_BODY, password, passwordConfirmation: password }).ok,
     ).toBe(true);
-  });
-
-  it("rejects a password with 1025 characters with a message in Portuguese", () => {
-    const password = "a".repeat(1025);
-    expect(validateSignup({ ...VALID_BODY, password, passwordConfirmation: password })).toEqual({
-      ok: false,
-      errors: { password: "A senha deve ter no máximo 1024 caracteres." },
-    });
-  });
-
-  it("counts the password maximum in code points, not UTF-16 units", () => {
-    const password = "🔐".repeat(1025);
-    expect(validateSignup({ ...VALID_BODY, password, passwordConfirmation: password })).toMatchObject({
-      ok: false,
-      errors: { password: MESSAGES.passwordTooLong },
-    });
   });
 
   it("rejects an empty password", () => {

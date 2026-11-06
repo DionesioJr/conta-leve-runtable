@@ -70,11 +70,30 @@ export async function hashPassword(password: string): Promise<string> {
   ].join("$");
 }
 
+// Com os parâmetros já validados por isValidCost, a única causa de ERR_CRYPTO_INVALID_SCRYPT_PARAMS
+// é o custo de memória acima de MAX_MEMORY (hash gravado com custo maior que o limite atual).
+function isScryptMemoryLimitError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "ERR_CRYPTO_INVALID_SCRYPT_PARAMS"
+  );
+}
+
 export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
   const parsed = parseHash(storedHash);
   if (!parsed) {
     return false;
   }
-  const key = await deriveKey(password, parsed.salt, parsed.cost);
+  let key: Buffer;
+  try {
+    key = await deriveKey(password, parsed.salt, parsed.cost);
+  } catch (error) {
+    if (isScryptMemoryLimitError(error)) {
+      return false;
+    }
+    throw error;
+  }
   return timingSafeEqual(key, parsed.key);
 }

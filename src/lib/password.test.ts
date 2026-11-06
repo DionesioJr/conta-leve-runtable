@@ -65,6 +65,15 @@ describe("verifyPassword", () => {
     );
   });
 
+  it("returns false instead of throwing when the stored cost exceeds the memory limit", async () => {
+    // N=2^20 com r=8 exige 128 * N * r = 1 GiB, acima do maxmem de 256 MB.
+    const hash = await hashPassword(PASSWORD);
+    const [, , r, p, salt, key] = hash.split("$");
+    await expect(
+      verifyPassword(PASSWORD, `scrypt$1048576$${r}$${p}$${salt}$${key}`),
+    ).resolves.toBe(false);
+  });
+
   it("returns false for a stored hash with a truncated key", async () => {
     const hash = await hashPassword(PASSWORD);
     const truncated = hash.slice(0, hash.lastIndexOf("$") + 5);

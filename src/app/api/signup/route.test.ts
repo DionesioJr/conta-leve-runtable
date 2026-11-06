@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { insertUser } from "../../../db/user-repository";
 import { SIGNUP_ATTEMPT_LIMIT, signupAttemptLimiter } from "../../../lib/signup-attempt-limiter";
 import { POST } from "./route";
@@ -37,6 +37,12 @@ function postJson(body: unknown, ip: string = CLIENT_IP): Request {
 beforeEach(() => {
   insertUserMock.mockReset();
   signupAttemptLimiter.reset();
+  // Um proxy confiável na frente: o último hop do x-forwarded-for é o IP de origem.
+  vi.stubEnv("TRUSTED_PROXY_COUNT", "1");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe("POST /api/signup", () => {
@@ -80,17 +86,6 @@ describe("POST /api/signup", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
       errors: { password: "A senha deve ter pelo menos 8 caracteres." },
-    });
-    expect(insertUserMock).not.toHaveBeenCalled();
-  });
-
-  it("answers 400 with a Portuguese message for a password longer than 1024 characters", async () => {
-    const password = "a".repeat(1025);
-    const response = await POST(postJson({ ...VALID_BODY, password, passwordConfirmation: password }));
-
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
-      errors: { password: "A senha deve ter no máximo 1024 caracteres." },
     });
     expect(insertUserMock).not.toHaveBeenCalled();
   });
@@ -165,6 +160,25 @@ describe("POST /api/signup", () => {
     const response = await POST(postJson(VALID_BODY, "203.0.113.50"));
 
     expect(response.status).toBe(201);
+  });
+
+  it("does not apply the limit, nor share one bucket, when no trusted proxy is configured", async () => {
+    vi.stubEnv("TRUSTED_PROXY_COUNT", "");
+    insertUserMock.mockResolvedValue({ ok: true, id: 11 });
+
+    for (let attempt = 0; attempt < SIGNUP_ATTEMPT_LIMIT + 5; attempt += 1) {
+      const response = await POST(postJson(VALID_BODY, `203.0.113.${attempt}`));
+      expect(response.status).toBe(201);
+    }
+    const realIpOnlyResponse = await POST(
+      new Request("http://localhost/api/signup", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-real-ip": "203.0.113.99" },
+        body: JSON.stringify(VALID_BODY),
+      }),
+    );
+
+    expect(realIpOnlyResponse.status).toBe(201);
   });
 
   it("does not count requests with an invalid body toward the limit", async () => {

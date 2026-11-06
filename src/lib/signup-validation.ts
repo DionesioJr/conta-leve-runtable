@@ -15,7 +15,6 @@ export type SignupValidation =
 export const NAME_MAX_LENGTH = 120;
 export const EMAIL_MAX_LENGTH = 255;
 export const PASSWORD_MIN_LENGTH = 8;
-export const PASSWORD_MAX_LENGTH = 1024;
 
 export const MESSAGES = {
   nameRequired: "Informe seu nome.",
@@ -23,7 +22,6 @@ export const MESSAGES = {
   emailRequired: "Informe seu e-mail.",
   emailInvalid: "Informe um e-mail válido.",
   passwordTooShort: `A senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres.`,
-  passwordTooLong: `A senha deve ter no máximo ${PASSWORD_MAX_LENGTH} caracteres.`,
   passwordMismatch: "As senhas não coincidem.",
   emailTaken: "Já existe uma conta com este e-mail.",
   bodyNotJson: "O corpo da requisição deve ser JSON.",
@@ -76,8 +74,6 @@ export function validateSignup(body: unknown): SignupValidation {
   const passwordLength = [...password].length;
   if (passwordLength < PASSWORD_MIN_LENGTH) {
     errors.password = MESSAGES.passwordTooShort;
-  } else if (passwordLength > PASSWORD_MAX_LENGTH) {
-    errors.password = MESSAGES.passwordTooLong;
   }
 
   if (passwordConfirmation !== password) {
