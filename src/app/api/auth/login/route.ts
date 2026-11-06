@@ -9,13 +9,16 @@ import {
 
 export const runtime = "nodejs";
 
+const UNAVAILABLE_MESSAGE = "Serviço indisponível. Tente novamente mais tarde.";
+
+function unavailable() {
+  return NextResponse.json({ error: UNAVAILABLE_MESSAGE }, { status: 500 });
+}
+
 export async function POST(request: Request) {
   const secret = process.env.SESSION_SECRET;
   if (!secret || secret.length < 32) {
-    return NextResponse.json(
-      { error: "Serviço indisponível. Tente novamente mais tarde." },
-      { status: 500 },
-    );
+    return unavailable();
   }
 
   let body: unknown = null;
@@ -33,10 +36,7 @@ export async function POST(request: Request) {
       secret,
     });
   } catch {
-    return NextResponse.json(
-      { error: "Serviço indisponível. Tente novamente mais tarde." },
-      { status: 500 },
-    );
+    return unavailable();
   }
 
   if (result.status === 400) {
