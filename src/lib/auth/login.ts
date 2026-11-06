@@ -13,7 +13,6 @@ export type LoginDeps = {
 
 export type LoginResult =
   | { status: 204; token: string }
-  | { status: 400 }
   | { status: 401 };
 
 const MAX_EMAIL_LENGTH = 255;
@@ -49,7 +48,7 @@ export async function login(
 ): Promise<LoginResult> {
   const input = parseLoginInput(body);
   if (!input) {
-    return { status: 400 };
+    return { status: 401 };
   }
   const user = await deps.findUserByEmail(input.email);
   const valid = await verifyPassword(

@@ -74,12 +74,13 @@ describe("POST /api/auth/login", () => {
     expect(response.headers.get("set-cookie")).toBeNull();
   });
 
-  it("responde 400 para corpo inválido ou ausente sem consultar o banco", async () => {
+  it("responde 401 para corpo inválido ou ausente sem consultar o banco", async () => {
     const invalid = await POST(makeRequest({ email: "ruim", password: "a" }));
     const notJson = await POST(makeRequest(null, "não é json"));
 
-    expect(invalid.status).toBe(400);
-    expect(notJson.status).toBe(400);
+    expect(invalid.status).toBe(401);
+    expect(notJson.status).toBe(401);
+    expect(notJson.headers.get("set-cookie")).toBeNull();
     expect(findUserByEmail).not.toHaveBeenCalled();
   });
 

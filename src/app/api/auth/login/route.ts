@@ -40,12 +40,6 @@ export async function POST(request: Request) {
     return unavailable();
   }
 
-  if (result.status === 400) {
-    return NextResponse.json(
-      { error: "Informe e-mail e senha válidos." },
-      { status: 400 },
-    );
-  }
   if (result.status === 401) {
     return NextResponse.json(
       { error: "E-mail ou senha incorretos." },

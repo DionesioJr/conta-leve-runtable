@@ -68,10 +68,10 @@ describe("login", () => {
     expect(result).toEqual({ status: 401 });
   });
 
-  it("retorna 400 sem consultar o banco com entrada inválida", async () => {
+  it("retorna 401 sem consultar o banco com entrada inválida", async () => {
     const deps = await makeDeps();
     const result = await login({ email: "", password: "" }, deps);
-    expect(result).toEqual({ status: 400 });
+    expect(result).toEqual({ status: 401 });
     expect(deps.findUserByEmail).not.toHaveBeenCalled();
   });
 });
