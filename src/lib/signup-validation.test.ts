@@ -53,6 +53,29 @@ describe("validateSignup", () => {
     });
   });
 
+  it("counts password length in code points, not UTF-16 units", () => {
+    // Cada emoji tem 2 unidades UTF-16: "🔐🔐🔐🔐" tem length 8 mas 4 caracteres.
+    const fourEmojis = "🔐".repeat(4);
+    expect(fourEmojis.length).toBe(8);
+    const result = validateSignup({
+      ...VALID_BODY,
+      password: fourEmojis,
+      passwordConfirmation: fourEmojis,
+    });
+    expect(result).toEqual({
+      ok: false,
+      errors: { password: "A senha deve ter pelo menos 8 caracteres." },
+    });
+  });
+
+  it("accepts a password with 8 code points even when UTF-16 length is larger", () => {
+    const eightEmojis = "🔐".repeat(8);
+    expect(eightEmojis.length).toBe(16);
+    expect(
+      validateSignup({ ...VALID_BODY, password: eightEmojis, passwordConfirmation: eightEmojis }).ok,
+    ).toBe(true);
+  });
+
   it("rejects an empty password", () => {
     const result = validateSignup({ ...VALID_BODY, password: "", passwordConfirmation: "" });
     expect(result).toMatchObject({ ok: false, errors: { password: MESSAGES.passwordTooShort } });

@@ -67,7 +67,9 @@ export function validateSignup(body: unknown): SignupValidation {
     errors.email = MESSAGES.emailInvalid;
   }
 
-  if (password.length < PASSWORD_MIN_LENGTH) {
+  // Conta code points (caracteres Unicode), não unidades UTF-16: emojis e
+  // caracteres fora do BMP ocupam mais de uma unidade em `.length`.
+  if ([...password].length < PASSWORD_MIN_LENGTH) {
     errors.password = MESSAGES.passwordTooShort;
   }
 
