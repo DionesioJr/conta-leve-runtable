@@ -1,5 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { hashPassword, verifyPassword } from "./password";
+import { deriveKey, hashPassword, SCRYPT_PARAMS, verifyPassword } from "./password";
+
+describe("scrypt parameters", () => {
+  it("are fixed at N=16384, r=8, p=1", () => {
+    expect(SCRYPT_PARAMS).toEqual({ N: 16384, r: 8, p: 1 });
+  });
+
+  it("derive the RFC 7914 test vector (password/NaCl, N=1024, r=8, p=16)", async () => {
+    const key = await deriveKey("password", Buffer.from("NaCl"), 64, { N: 1024, r: 8, p: 16 });
+    expect(key.toString("hex")).toBe(
+      "fdbabe1c9d3472007856e7190d01e9fe7c6ad7cbc8237830e77376634b3731622eaf30d92e22a3886ff109279d9830dac727afb94a83ee6d8360cbdfa2cc0640",
+    );
+  });
+
+  it("stored hash equals scrypt with the fixed parameters", async () => {
+    const hash = await hashPassword("senha-segura-123");
+    const [, saltHex, keyHex] = hash.split("$");
+    const key = await deriveKey("senha-segura-123", Buffer.from(saltHex, "hex"), 64, SCRYPT_PARAMS);
+    expect(key.toString("hex")).toBe(keyHex);
+  });
+});
 
 describe("hashPassword", () => {
   it("produces the scrypt$<salt hex>$<key hex> format", async () => {
