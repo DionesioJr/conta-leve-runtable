@@ -8,13 +8,17 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:migrate": "tsx src/db/migrate-cli.ts up",
+    "db:migrate:down": "tsx src/db/migrate-cli.ts down"
   },
   "dependencies": {
+    "drizzle-orm": "0.44.5",
     "mysql2": "3.14.1",
     "next": "15.5.9",
     "react": "19.1.2",
-    "react-dom": "19.1.2"
+    "react-dom": "19.1.2",
+    "umzug": "3.8.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "3.3.1",
@@ -27,6 +31,7 @@
     "eslint-config-next": "15.5.9",
     "postcss": "8.5.6",
     "tailwindcss": "4.1.13",
+    "tsx": "4.20.5",
     "typescript": "5.9.2",
     "vitest": "3.2.4"
   }
