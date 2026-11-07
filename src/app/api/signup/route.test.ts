@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { insertUser } from "../../../db/user-repository";
 import { SIGNUP_ATTEMPT_LIMIT, signupAttemptLimiter } from "../../../lib/signup-attempt-limiter";
 import { POST } from "./route";
@@ -37,6 +37,10 @@ function postJson(body: unknown, ip: string = CLIENT_IP): Request {
 beforeEach(() => {
   insertUserMock.mockReset();
   signupAttemptLimiter.reset();
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe("POST /api/signup", () => {
@@ -168,7 +172,8 @@ describe("POST /api/signup", () => {
     expect(response.status).toBe(429);
   });
 
-  it("answers 500 and stores nothing when the origin IP cannot be identified, never sharing one bucket", async () => {
+  it("answers 500 and stores nothing in production when the origin IP cannot be identified", async () => {
+    vi.stubEnv("NODE_ENV", "production");
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     insertUserMock.mockResolvedValue({ ok: true, id: 11 });
 
@@ -183,6 +188,21 @@ describe("POST /api/signup", () => {
     expect(response.status).toBe(500);
     expect(insertUserMock).not.toHaveBeenCalled();
     consoleError.mockRestore();
+  });
+
+  it("answers 201 outside production without a proxy header, and does not share a limit bucket", async () => {
+    insertUserMock.mockResolvedValue({ ok: true, id: 12 });
+
+    for (let attempt = 0; attempt < SIGNUP_ATTEMPT_LIMIT + 1; attempt += 1) {
+      const response = await POST(
+        new Request("http://localhost/api/signup", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ...VALID_BODY, email: `pessoa${attempt}@exemplo.com.br` }),
+        }),
+      );
+      expect(response.status).toBe(201);
+    }
   });
 
   it("does not count requests with an invalid body toward the limit", async () => {

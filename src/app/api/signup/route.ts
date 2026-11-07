@@ -23,7 +23,13 @@ export async function POST(request: Request): Promise<Response> {
       registerAttempt: () => {
         const clientIp = readClientIp(request);
         if (clientIp === null) {
-          throw new Error("Cabeçalho x-forwarded-for ausente: IP de origem não identificado.");
+          // Em produção o serviço fica atrás de proxy que anexa x-forwarded-for.
+          // Sem ele, não há IP de origem confiável: falha fechada, sem gravar cadastro.
+          if (process.env.NODE_ENV === "production") {
+            throw new Error("Cabeçalho x-forwarded-for ausente: IP de origem não identificado.");
+          }
+          // Fora de produção (dev local, testes) não há proxy. Sem IP não há o que limitar.
+          return { allowed: true };
         }
         return signupAttemptLimiter.consume(clientIp);
       },
