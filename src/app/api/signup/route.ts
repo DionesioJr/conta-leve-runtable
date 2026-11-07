@@ -1,5 +1,4 @@
-import { getPool } from "../../../db/connection";
-import { insertUser } from "../../../db/user-repository";
+import { getPool, insertUser } from "../../../db/user-repository";
 import { hashPassword } from "../../../lib/password";
 import { readClientIp } from "../../../lib/client-ip";
 import { signupAttemptLimiter } from "../../../lib/signup-attempt-limiter";
@@ -23,13 +22,9 @@ export async function POST(request: Request): Promise<Response> {
       registerAttempt: () => {
         const clientIp = readClientIp(request);
         if (clientIp === null) {
-          // Em produção o serviço fica atrás de proxy que anexa x-forwarded-for.
-          // Sem ele, não há IP de origem confiável: falha fechada, sem gravar cadastro.
-          if (process.env.NODE_ENV === "production") {
-            throw new Error("Cabeçalho x-forwarded-for ausente: IP de origem não identificado.");
-          }
-          // Fora de produção (dev local, testes) não há proxy. Sem IP não há o que limitar.
-          return { allowed: true };
+          // Sem x-forwarded-for não há IP de origem: não dá para limitar, então o cadastro falha
+          // fechado em qualquer ambiente, sem gravar conta. Ver readClientIp sobre a premissa de proxy.
+          throw new Error("Cabeçalho x-forwarded-for ausente: IP de origem não identificado.");
         }
         return signupAttemptLimiter.consume(clientIp);
       },

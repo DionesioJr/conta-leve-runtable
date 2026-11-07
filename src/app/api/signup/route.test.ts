@@ -1,17 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { insertUser } from "../../../db/user-repository";
 import { SIGNUP_ATTEMPT_LIMIT, signupAttemptLimiter } from "../../../lib/signup-attempt-limiter";
 import { POST } from "./route";
-
-vi.mock("../../../db/connection", () => ({
-  getPool: () => ({}),
-}));
 
 vi.mock("../../../lib/password", () => ({
   hashPassword: vi.fn(async () => "scrypt$131072$8$1$c2FsdA==$a2V5"),
 }));
 
 vi.mock("../../../db/user-repository", () => ({
+  getPool: () => ({}),
   insertUser: vi.fn(),
 }));
 
@@ -37,10 +34,6 @@ function postJson(body: unknown, ip: string = CLIENT_IP): Request {
 beforeEach(() => {
   insertUserMock.mockReset();
   signupAttemptLimiter.reset();
-});
-
-afterEach(() => {
-  vi.unstubAllEnvs();
 });
 
 describe("POST /api/signup", () => {
@@ -172,8 +165,7 @@ describe("POST /api/signup", () => {
     expect(response.status).toBe(429);
   });
 
-  it("answers 500 and stores nothing in production when the origin IP cannot be identified", async () => {
-    vi.stubEnv("NODE_ENV", "production");
+  it("fails closed with 500 and stores nothing when the request has no x-forwarded-for, in any environment", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     insertUserMock.mockResolvedValue({ ok: true, id: 11 });
 
@@ -186,23 +178,35 @@ describe("POST /api/signup", () => {
     );
 
     expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      errors: { form: "Não foi possível criar a conta. Tente novamente." },
+    });
     expect(insertUserMock).not.toHaveBeenCalled();
     consoleError.mockRestore();
   });
 
-  it("answers 201 outside production without a proxy header, and does not share a limit bucket", async () => {
-    insertUserMock.mockResolvedValue({ ok: true, id: 12 });
+  it("a request without a proxy header never reaches the repository, and does not reset the limit of a client that has one", async () => {
+    insertUserMock.mockResolvedValue({ ok: false, reason: "email_taken" });
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    for (let attempt = 0; attempt < SIGNUP_ATTEMPT_LIMIT + 1; attempt += 1) {
-      const response = await POST(
-        new Request("http://localhost/api/signup", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ...VALID_BODY, email: `pessoa${attempt}@exemplo.com.br` }),
-        }),
-      );
-      expect(response.status).toBe(201);
+    for (let attempt = 0; attempt < SIGNUP_ATTEMPT_LIMIT; attempt += 1) {
+      await POST(postJson(VALID_BODY));
     }
+    insertUserMock.mockClear();
+
+    const withoutHeader = await POST(
+      new Request("http://localhost/api/signup", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(VALID_BODY),
+      }),
+    );
+    const withHeader = await POST(postJson(VALID_BODY));
+
+    expect(withoutHeader.status).toBe(500);
+    expect(withHeader.status).toBe(429);
+    expect(insertUserMock).not.toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   it("does not count requests with an invalid body toward the limit", async () => {

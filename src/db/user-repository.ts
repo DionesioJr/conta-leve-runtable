@@ -42,7 +42,7 @@ export async function insertUser(
 
 let pool: Pool | null = null;
 
-function getPool(): Pool {
+export function getPool(): Pool {
   if (!pool) {
     const url = process.env.DATABASE_URL;
     if (!url) {
